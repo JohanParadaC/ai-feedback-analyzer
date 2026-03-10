@@ -1,0 +1,20 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencias (¡NUNCA subir node_modules!)
+node_modules/
+
+# Compilados de TypeScript
+dist/
+build/
+
+# Variables de entorno y secretos (¡LO MÁS IMPORTANTE!)
+.env
+.env.test
+.env.production
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db

@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Un fondo general elegante para nuestro Dashboard */
+body {
+  background-color: #f8fafc;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+}
