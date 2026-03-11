@@ -1,4 +1,3 @@
-// ¡Asegúrate de que diga "export type" y "export interface"!
 export type Sentiment = 'positivo' | 'negativo' | 'neutral';
 
 export interface AnalysisResult {
@@ -8,4 +7,5 @@ export interface AnalysisResult {
     score: number;
     key_complaint: string | null;
     key_highlight: string | null;
+    date: string; // ✨ ¡Nueva propiedad para la línea de tiempo!
 }

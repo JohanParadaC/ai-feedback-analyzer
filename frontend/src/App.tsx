@@ -2,6 +2,8 @@ import { useRef } from 'react';
 import { useFeedback } from './hooks/useFeedback';
 import { downloadPDF } from './utils/pdfExport';
 import { PainPointsChart } from './components/PainPointsChart';
+// ✨ CAMBIO 1: Importamos nuestro nuevo componente de Tendencias ✨
+import { SentimentTrendChart } from './components/SentimentTrendChart';
 
 // Importamos nuestras piezas de Lego (Componentes)
 import { Header } from './components/Header';
@@ -13,7 +15,8 @@ import { PrintTemplate } from './components/PrintTemplate';
 
 export default function App() {
   // 1. Traemos toda la lógica y estados desde nuestro Custom Hook
-  const { feedback, setFeedback, loading, setLoading, history, handleAnalyze } = useFeedback();
+  // ✨ CAMBIO: Extraemos handleBulkAnalyze del hook para la carga masiva ✨
+  const { feedback, setFeedback, loading, setLoading, history, handleAnalyze, handleBulkAnalyze } = useFeedback();
 
   // 2. Referencia para el PDF
   const pdfRef = useRef<HTMLDivElement>(null);
@@ -62,13 +65,15 @@ export default function App() {
             setFeedback={setFeedback}
             loading={loading}
             onAnalyze={handleAnalyze}
+            // ✨ CAMBIO: Le pasamos la función al componente para que el botón funcione ✨
+            onBulkAnalyze={handleBulkAnalyze}
           />
           <MetricsPanel
             chartData={chartData}
             averageScore={averageScore}
           />
 
-          {/* ✨ AQUÍ AGREGAMOS LA NUEVA GRÁFICA ✨ */}
+          {/* NUESTRA GRÁFICA DE PROBLEMAS */}
           <PainPointsChart history={history} />
 
         </section>
@@ -81,6 +86,11 @@ export default function App() {
             theme={theme}
           />
         </section>
+
+        {/* ✨ CAMBIO 2: Aquí va nuestro nuevo Gráfico de Tendencias de Tiempo ✨ */}
+        <div className="lg:col-span-12">
+          <SentimentTrendChart history={history} />
+        </div>
 
         {/* Fila Inferior */}
         <HistoryTable history={history} />

@@ -1,4 +1,5 @@
 import type { AnalysisResult } from '../types';
+
 interface HistoryTableProps {
     history: AnalysisResult[];
 }
@@ -19,7 +20,8 @@ export const HistoryTable = ({ history }: HistoryTableProps) => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                                <th className="p-4 pl-6 font-semibold">Reseña (Fragmento)</th>
+                                {/* ✨ CAMBIO: Le quitamos la palabra "(Fragmento)" al título ✨ */}
+                                <th className="p-4 pl-6 font-semibold w-1/2">Reseña</th>
                                 <th className="p-4 font-semibold">Sentimiento</th>
                                 <th className="p-4 font-semibold">Score</th>
                                 <th className="p-4 pr-6 font-semibold">Etiquetas Extraídas</th>
@@ -28,7 +30,10 @@ export const HistoryTable = ({ history }: HistoryTableProps) => {
                         <tbody className="divide-y divide-slate-100">
                             {history.map((item) => (
                                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 pl-6 text-sm text-slate-700 max-w-xs md:max-w-md truncate font-medium" title={item.text}>
+                                    {/* ✨ EL CAMBIO MAGNÍFICO ✨ 
+                                        Quitamos "truncate" y "max-w-...", ahora el texto respirará 
+                                        y hará saltos de línea automáticos (whitespace-normal) */}
+                                    <td className="p-4 pl-6 text-sm text-slate-700 font-medium whitespace-normal" title={item.text}>
                                         "{item.text}"
                                     </td>
 

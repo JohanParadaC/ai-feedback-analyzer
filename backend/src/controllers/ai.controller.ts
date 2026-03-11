@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 
+
 // 1. CARGAMOS LAS VARIABLES AQUÍ MISMO ANTES DE INICIALIZAR LA IA
 dotenv.config();
 
