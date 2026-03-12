@@ -1,12 +1,11 @@
 import { Request, Response } from 'express';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+// ✨ 1. IMPORTAMOS NUESTRO MOLDE DE BASE DE DATOS
+import Feedback from '../models/Feedback.js';
 
-
-// 1. CARGAMOS LAS VARIABLES AQUÍ MISMO ANTES DE INICIALIZAR LA IA
 dotenv.config();
 
-// 2. AHORA SÍ, INICIALIZAMOS OPENAI (Ya encontrará la llave en el .env)
 const openai = new OpenAI();
 
 export const testConnection = (req: Request, res: Response) => {
@@ -15,21 +14,21 @@ export const testConnection = (req: Request, res: Response) => {
 
 export const analyzeFeedback = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { feedback } = req.body;
+        // Aceptamos también "date" por si el usuario sube un CSV con fechas antiguas
+        const { feedback, date } = req.body;
 
         if (!feedback) {
             res.status(400).json({ error: "Por favor envía un texto para analizar." });
             return;
         }
 
-        console.log("Analizando comentario:", feedback);
+        console.log("🧠 Analizando comentario con IA:", feedback);
 
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini", // Modelo rápido, barato y eficiente
+            model: "gpt-4o-mini",
             messages: [
                 {
                     role: "system",
-                    // 👇 AQUÍ ESTÁ EL CAMBIO MÁGICO: Actualizamos el Prompt 👇
                     content: `Eres un analista de datos de e-commerce. Analiza el comentario del cliente. Responde ÚNICAMENTE con un objeto JSON válido con las propiedades: 'sentiment' (Positivo, Negativo, Neutral), 'score' (número del 1 al 10), 'key_complaint' (una de las categorías predefinidas o null), y 'key_highlight' (resumen de lo que más le gustó en máximo 5 palabras, o null si no hay nada destacable).
                     
                     🚨 REGLA ESTRICTA PARA 'key_complaint' (EVITAR DUPLICADOS EN GRÁFICAS):
@@ -59,11 +58,41 @@ export const analyzeFeedback = async (req: Request, res: Response): Promise<void
             response_format: { type: "json_object" },
         });
 
+        // 2. Extraemos la respuesta de la IA
         const aiResponse = completion.choices[0].message.content;
-        res.status(200).json(JSON.parse(aiResponse as string));
+        const aiData = JSON.parse(aiResponse as string);
+
+        console.log("💾 Guardando en Base de Datos...");
+
+        // ✨ 3. MAGIA: GUARDAMOS EN MONGODB ✨
+        const nuevoFeedback = await Feedback.create({
+            text: feedback,
+            sentiment: aiData.sentiment.toLowerCase(), // A minúsculas para cumplir la regla del molde
+            score: aiData.score,
+            key_complaint: aiData.key_complaint,
+            key_highlight: aiData.key_highlight,
+            date: date ? new Date(date) : new Date() // Usa la fecha del CSV o la fecha de hoy
+        });
+
+        console.log("✅ ¡Guardado con éxito!");
+
+        // 4. Devolvemos al Frontend la reseña ya guardada (con su ID de Mongo)
+        res.status(200).json(nuevoFeedback);
 
     } catch (error) {
-        console.error("Error con OpenAI:", error);
-        res.status(500).json({ error: "Fallo al procesar el análisis con IA." });
+        console.error("❌ Error con OpenAI o MongoDB:", error);
+        res.status(500).json({ error: "Fallo al procesar o guardar el análisis." });
+    }
+};
+// Agrega esta función al final de tu ai.controller.ts
+export const getFeedbacks = async (req: Request, res: Response): Promise<void> => {
+    try {
+        console.log("📂 Frontend solicitando el historial de reseñas...");
+        // Buscamos todas las reseñas y las ordenamos por fecha descendente (-1)
+        const feedbacks = await Feedback.find().sort({ createdAt: -1 });
+        res.status(200).json(feedbacks);
+    } catch (error) {
+        console.error("❌ Error obteniendo reseñas:", error);
+        res.status(500).json({ error: "Fallo al obtener el historial de la base de datos." });
     }
 };

@@ -70,8 +70,7 @@ git clone https://github.com/JohanParadaC/ai-feedback-analyzer.git
 cd backend
 npm install
 # Crea un archivo .env en la raíz de /backend y añade tu OPENAI_API_KEY
-npm run dev
-
+npx tsx watch src/index.ts
 # Configura y levanta el Frontend 
 cd frontend
 npm install

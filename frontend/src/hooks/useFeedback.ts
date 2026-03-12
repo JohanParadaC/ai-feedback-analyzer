@@ -1,10 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { AnalysisResult, Sentiment } from '../types';
 
 export const useFeedback = () => {
     const [feedback, setFeedback] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
     const [history, setHistory] = useState<AnalysisResult[]>([]);
+
+    // ✨ 1. LA CURA PARA LA AMNESIA (Cargar datos al iniciar) ✨
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const response = await fetch('http://localhost:3000/api/feedbacks');
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Adaptamos lo que viene de Mongo para que la tabla lo entienda
+                    const formattedData: AnalysisResult[] = data.map((item: any) => ({
+                        id: item._id, // Mongo usa '_id'
+                        text: item.text,
+                        sentiment: item.sentiment.toLowerCase() as Sentiment,
+                        score: item.score,
+                        key_complaint: item.key_complaint,
+                        key_highlight: item.key_highlight,
+                        date: item.date || item.createdAt
+                    }));
+
+                    setHistory(formattedData);
+                }
+            } catch (error) {
+                console.error("Error cargando el historial desde la Base de Datos:", error);
+            }
+        };
+
+        fetchHistory();
+    }, []); // El array vacío significa: "Ejecutar solo 1 vez al cargar la página"
 
     // Función 1: Analizar UNA sola reseña
     const handleAnalyze = async () => {
@@ -18,13 +47,16 @@ export const useFeedback = () => {
                 body: JSON.stringify({ feedback })
             });
 
-            const data = await response.json();
+            const data = await response.json(); // Ahora 'data' trae la reseña directa de Mongo
+
             const newResult: AnalysisResult = {
-                id: Date.now(),
-                text: feedback,
-                ...data,
+                id: data._id, // ✨ CAMBIO: Usamos el ID real de la base de datos
+                text: data.text,
                 sentiment: data.sentiment.toLowerCase() as Sentiment,
-                date: new Date().toISOString() // ✨ CAMBIO: Guardamos la fecha y hora actual
+                score: data.score,
+                key_complaint: data.key_complaint,
+                key_highlight: data.key_highlight,
+                date: data.date || data.createdAt // ✨ CAMBIO: Usamos la fecha de Mongo
             };
 
             setHistory(prev => [newResult, ...prev]);
@@ -38,7 +70,7 @@ export const useFeedback = () => {
         }
     };
 
-    // ✨ NUEVA Función 2: Analizar MUCHAS reseñas (Ahora acepta objetos con fecha) ✨
+    // Función 2: Analizar MUCHAS reseñas
     const handleBulkAnalyze = async (items: { text: string, date: string }[]) => {
         setLoading(true);
 
@@ -50,17 +82,19 @@ export const useFeedback = () => {
                 const response = await fetch('http://localhost:3000/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ feedback: item.text })
+                    body: JSON.stringify({ feedback: item.text, date: item.date }) // Mandamos la fecha
                 });
 
                 if (response.ok) {
                     const data = await response.json();
                     const newResult: AnalysisResult = {
-                        id: Date.now() + Math.random(), // Evita IDs duplicados si va muy rápido
-                        text: item.text,
-                        ...data,
+                        id: data._id, // ✨ CAMBIO: ID de Mongo
+                        text: data.text,
                         sentiment: data.sentiment.toLowerCase() as Sentiment,
-                        date: item.date // ✨ CAMBIO: Usamos la fecha que nos manda el formulario
+                        score: data.score,
+                        key_complaint: data.key_complaint,
+                        key_highlight: data.key_highlight,
+                        date: data.date || data.createdAt // ✨ CAMBIO: Fecha de Mongo
                     };
 
                     // Actualizamos el historial enseguida para que se vea la animación
@@ -81,6 +115,6 @@ export const useFeedback = () => {
         setLoading,
         history,
         handleAnalyze,
-        handleBulkAnalyze // Exportamos el nuevo superpoder
+        handleBulkAnalyze
     };
 };

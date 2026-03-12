@@ -2,8 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRoutes from './routes/api.routes.js';
-// Carga las variables de entorno (API Key)
+
+import { connectDB } from './config/db.js';
+
+// Carga las variables de entorno (API Key y MONGO_URI)
 dotenv.config();
+
+// ✨ ENCENDEMOS LA BASE DE DATOS ANTES DE ARRANCAR EL SERVIDOR ✨
+connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
