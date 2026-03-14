@@ -1,22 +1,33 @@
 import { useState, useEffect } from 'react';
 import type { AnalysisResult, Sentiment } from '../types';
+// ✨ 1. IMPORTAMOS NUESTRA BILLETERA
+import { useAuth } from '../context/AuthContext';
 
 export const useFeedback = () => {
     const [feedback, setFeedback] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
     const [history, setHistory] = useState<AnalysisResult[]>([]);
 
-    // ✨ 1. LA CURA PARA LA AMNESIA (Cargar datos al iniciar) ✨
+    // ✨ 2. EXTRAEMOS AL USUARIO Y SU TOKEN (LA LLAVE)
+    const { user, logout } = useAuth();
+
+    // ✨ 3. ACTUALIZAMOS EL EFECTO: Solo carga si hay un usuario logueado
     useEffect(() => {
         const fetchHistory = async () => {
+            if (!user) return; // Si no hay usuario, no hacemos nada
+
             try {
-                const response = await fetch('http://localhost:3000/api/feedbacks');
+                const response = await fetch('http://localhost:3000/api/feedbacks', {
+                    // 👉 AQUÍ ESTÁ LA MAGIA: LE MOSTRAMOS LA TARJETA AL GUARDIA
+                    headers: {
+                        'Authorization': `Bearer ${user.token}`
+                    }
+                });
+
                 if (response.ok) {
                     const data = await response.json();
-
-                    // Adaptamos lo que viene de Mongo para que la tabla lo entienda
                     const formattedData: AnalysisResult[] = data.map((item: any) => ({
-                        id: item._id, // Mongo usa '_id'
+                        id: item._id,
                         text: item.text,
                         sentiment: item.sentiment.toLowerCase() as Sentiment,
                         score: item.score,
@@ -24,39 +35,50 @@ export const useFeedback = () => {
                         key_highlight: item.key_highlight,
                         date: item.date || item.createdAt
                     }));
-
                     setHistory(formattedData);
+                } else if (response.status === 401) {
+                    // Si el guardia nos rechaza (ej. token caducado), cerramos sesión por seguridad
+                    logout();
                 }
             } catch (error) {
-                console.error("Error cargando el historial desde la Base de Datos:", error);
+                console.error("Error cargando el historial:", error);
             }
         };
 
         fetchHistory();
-    }, []); // El array vacío significa: "Ejecutar solo 1 vez al cargar la página"
+    }, [user, logout]); // 🔄 Se vuelve a ejecutar cada vez que el usuario inicia sesión
 
     // Función 1: Analizar UNA sola reseña
     const handleAnalyze = async () => {
-        if (!feedback.trim()) return;
+        if (!feedback.trim() || !user) return; // Protegemos si no hay sesión
         setLoading(true);
 
         try {
             const response = await fetch('http://localhost:3000/api/analyze', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    // 👉 TARJETA EN MANO PARA ANALIZAR
+                    'Authorization': `Bearer ${user.token}`
+                },
                 body: JSON.stringify({ feedback })
             });
 
-            const data = await response.json(); // Ahora 'data' trae la reseña directa de Mongo
+            if (!response.ok) {
+                if (response.status === 401) logout();
+                throw new Error("Error del servidor");
+            }
+
+            const data = await response.json();
 
             const newResult: AnalysisResult = {
-                id: data._id, // ✨ CAMBIO: Usamos el ID real de la base de datos
+                id: data._id,
                 text: data.text,
                 sentiment: data.sentiment.toLowerCase() as Sentiment,
                 score: data.score,
                 key_complaint: data.key_complaint,
                 key_highlight: data.key_highlight,
-                date: data.date || data.createdAt // ✨ CAMBIO: Usamos la fecha de Mongo
+                date: data.date || data.createdAt
             };
 
             setHistory(prev => [newResult, ...prev]);
@@ -64,7 +86,7 @@ export const useFeedback = () => {
 
         } catch (error) {
             console.error("Error conectando al backend:", error);
-            alert("Error de conexión. Revisa que tu backend esté corriendo.");
+            alert("Error al procesar la reseña. Intenta de nuevo.");
         } finally {
             setLoading(false);
         }
@@ -72,33 +94,39 @@ export const useFeedback = () => {
 
     // Función 2: Analizar MUCHAS reseñas
     const handleBulkAnalyze = async (items: { text: string, date: string }[]) => {
+        if (!user) return; // Protegemos si no hay sesión
         setLoading(true);
 
-        // Procesamos una por una para no bloquear el servidor de OpenAI
         for (const item of items) {
             if (!item.text.trim()) continue;
 
             try {
                 const response = await fetch('http://localhost:3000/api/analyze', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ feedback: item.text, date: item.date }) // Mandamos la fecha
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // 👉 TARJETA EN MANO PARA ANÁLISIS MASIVO
+                        'Authorization': `Bearer ${user.token}`
+                    },
+                    body: JSON.stringify({ feedback: item.text, date: item.date })
                 });
 
                 if (response.ok) {
                     const data = await response.json();
                     const newResult: AnalysisResult = {
-                        id: data._id, // ✨ CAMBIO: ID de Mongo
+                        id: data._id,
                         text: data.text,
                         sentiment: data.sentiment.toLowerCase() as Sentiment,
                         score: data.score,
                         key_complaint: data.key_complaint,
                         key_highlight: data.key_highlight,
-                        date: data.date || data.createdAt // ✨ CAMBIO: Fecha de Mongo
+                        date: data.date || data.createdAt
                     };
 
-                    // Actualizamos el historial enseguida para que se vea la animación
                     setHistory(prev => [newResult, ...prev]);
+                } else if (response.status === 401) {
+                    logout();
+                    break; // Si falla el token, paramos el ciclo entero
                 }
             } catch (error) {
                 console.error("Error en fila masiva:", item.text, error);

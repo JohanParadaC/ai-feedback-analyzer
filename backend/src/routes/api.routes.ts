@@ -1,16 +1,17 @@
 import { Router } from 'express';
-// ✨ IMPORTAMOS LA NUEVA FUNCIÓN 'getFeedbacks' ✨
 import { testConnection, analyzeFeedback, getFeedbacks } from '../controllers/ai.controller.js';
+// ✨ IMPORTAMOS A NUESTRO GUARDIA DE SEGURIDAD ✨
+import { protect } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-// Endpoint de prueba: GET /api/test
+// Endpoint de prueba (Este lo dejamos público por si quieres revisar que el servidor viva)
 router.get('/test', testConnection);
 
-// Endpoint principal para analizar y guardar: POST /api/analyze
-router.post('/analyze', analyzeFeedback);
+// ✨ LAS PUERTAS VIP: Le ponemos el guardia "protect" en medio ✨
+// Ahora Express ejecutará "protect" primero. Si todo sale bien, pasará a "analyzeFeedback".
+router.post('/analyze', protect, analyzeFeedback);
 
-// ✨ NUEVO ENDPOINT: Para pedir el historial: GET /api/feedbacks ✨
-router.get('/feedbacks', getFeedbacks);
+router.get('/feedbacks', protect, getFeedbacks);
 
 export default router;

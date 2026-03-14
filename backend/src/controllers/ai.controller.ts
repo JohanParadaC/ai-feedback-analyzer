@@ -1,12 +1,19 @@
 import { Request, Response } from 'express';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
-// ✨ 1. IMPORTAMOS NUESTRO MOLDE DE BASE DE DATOS
+import { z } from 'zod';
 import Feedback from '../models/Feedback.js';
 
 dotenv.config();
 
 const openai = new OpenAI();
+
+const feedbackSchema = z.object({
+    feedback: z.string()
+        .min(5, "El texto es muy corto (mínimo 5 caracteres).")
+        .max(2000, "El texto es demasiado largo. Máximo 2000 caracteres permitidos para no saturar la IA."),
+    date: z.string().optional()
+});
 
 export const testConnection = (req: Request, res: Response) => {
     res.json({ message: "¡Hola desde tu Backend en Node.js! La conexión es un éxito 🚀" });
@@ -14,35 +21,43 @@ export const testConnection = (req: Request, res: Response) => {
 
 export const analyzeFeedback = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Aceptamos también "date" por si el usuario sube un CSV con fechas antiguas
-        const { feedback, date } = req.body;
+        // ✨ PRIVACIDAD DE DATOS (PUNTO 9): Extraemos el ID del usuario desde el Guardia de Seguridad
+        const userId = (req as any).user?.id;
 
-        if (!feedback) {
-            res.status(400).json({ error: "Por favor envía un texto para analizar." });
+        if (!userId) {
+            res.status(401).json({ error: "Usuario no autenticado." });
             return;
         }
 
-        console.log("🧠 Analizando comentario con IA:", feedback);
+        const validData = feedbackSchema.safeParse(req.body);
+
+        if (!validData.success) {
+            const errorMessage = validData.error.issues[0]?.message || "Error de validación en el texto.";
+            res.status(400).json({ error: errorMessage });
+            return;
+        }
+
+        const { feedback, date } = validData.data;
+
+        let finalDate = new Date();
+        if (date) {
+            const parsedDate = new Date(date);
+            if (!isNaN(parsedDate.getTime())) {
+                finalDate = parsedDate;
+            } else {
+                console.warn(`⚠️ Fecha inválida recibida: "${date}". Usando la fecha actual.`);
+            }
+        }
+
+        console.log("🧠 Analizando comentario con IA (Usando Structured Outputs):", feedback);
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
                 {
                     role: "system",
-                    content: `Eres un analista de datos de e-commerce. Analiza el comentario del cliente. Responde ÚNICAMENTE con un objeto JSON válido con las propiedades: 'sentiment' (Positivo, Negativo, Neutral), 'score' (número del 1 al 10), 'key_complaint' (una de las categorías predefinidas o null), y 'key_highlight' (resumen de lo que más le gustó en máximo 5 palabras, o null si no hay nada destacable).
+                    content: `Eres un analista de datos de e-commerce. Analiza el comentario del cliente.
                     
-                    🚨 REGLA ESTRICTA PARA 'key_complaint' (EVITAR DUPLICADOS EN GRÁFICAS):
-                    Si hay una queja o problema, DEBES categorizarla eligiendo EXACTAMENTE UNA de estas opciones predefinidas (escribe el texto tal cual, respetando mayúsculas):
-                    - "Atención al Cliente"
-                    - "Falta de Respuesta"
-                    - "Problemas de Dinero/Reembolso"
-                    - "Tiempos de Envío"
-                    - "Producto Defectuoso/Baja Calidad"
-                    - "Problemas con Plataforma/Web"
-                    - "Publicidad Engañosa"
-                    - "Otro" (solo si es muy específico y no encaja en las anteriores)
-                    Si no hay ninguna queja, devuelve null.
-
                     REGLAS ESTRICTAS DE CALIFICACIÓN:
                     - Puntuación 1 a 4: Sentimiento Negativo (Quejas, problemas, frustración, sarcasmo evidente).
                     - Puntuación 5 a 6: Sentimiento Neutral (Cumplimiento de expectativas básicas, descripciones de hechos, consultas, ausencia de adjetivos emocionales o de alta satisfacción).
@@ -55,28 +70,68 @@ export const analyzeFeedback = async (req: Request, res: Response): Promise<void
                     content: feedback
                 }
             ],
-            response_format: { type: "json_object" },
+            response_format: {
+                type: "json_schema",
+                json_schema: {
+                    name: "feedback_analysis_schema",
+                    strict: true,
+                    schema: {
+                        type: "object",
+                        properties: {
+                            sentiment: {
+                                type: "string",
+                                enum: ["positivo", "neutral", "negativo"],
+                                description: "El sentimiento general de la reseña."
+                            },
+                            score: {
+                                type: "integer",
+                                description: "Calificación del 1 al 10 basada en las reglas."
+                            },
+                            key_complaint: {
+                                type: ["string", "null"],
+                                enum: [
+                                    "Atención al Cliente",
+                                    "Falta de Respuesta",
+                                    "Problemas de Dinero/Reembolso",
+                                    "Tiempos de Envío",
+                                    "Producto Defectuoso/Baja Calidad",
+                                    "Problemas con Plataforma/Web",
+                                    "Publicidad Engañosa",
+                                    "Otro",
+                                    null
+                                ],
+                                description: "Categoría de la queja principal, o null si no hay ninguna queja."
+                            },
+                            key_highlight: {
+                                type: ["string", "null"],
+                                description: "Resumen de lo que más le gustó en máximo 5 palabras, o null si no hay nada destacable."
+                            }
+                        },
+                        required: ["sentiment", "score", "key_complaint", "key_highlight"],
+                        additionalProperties: false
+                    }
+                }
+            }
         });
 
-        // 2. Extraemos la respuesta de la IA
         const aiResponse = completion.choices[0].message.content;
         const aiData = JSON.parse(aiResponse as string);
 
         console.log("💾 Guardando en Base de Datos...");
 
-        // ✨ 3. MAGIA: GUARDAMOS EN MONGODB ✨
+        // ✨ PRIVACIDAD DE DATOS (PUNTO 9): GUARDAMOS LA RESEÑA A NOMBRE DE ESTE USUARIO ✨
         const nuevoFeedback = await Feedback.create({
             text: feedback,
-            sentiment: aiData.sentiment.toLowerCase(), // A minúsculas para cumplir la regla del molde
+            sentiment: aiData.sentiment.toLowerCase(),
             score: aiData.score,
             key_complaint: aiData.key_complaint,
             key_highlight: aiData.key_highlight,
-            date: date ? new Date(date) : new Date() // Usa la fecha del CSV o la fecha de hoy
+            date: finalDate,
+            userId: userId // 👈 ¡La atamos a la empresa dueña!
         });
 
         console.log("✅ ¡Guardado con éxito!");
 
-        // 4. Devolvemos al Frontend la reseña ya guardada (con su ID de Mongo)
         res.status(200).json(nuevoFeedback);
 
     } catch (error) {
@@ -84,12 +139,22 @@ export const analyzeFeedback = async (req: Request, res: Response): Promise<void
         res.status(500).json({ error: "Fallo al procesar o guardar el análisis." });
     }
 };
-// Agrega esta función al final de tu ai.controller.ts
+
 export const getFeedbacks = async (req: Request, res: Response): Promise<void> => {
     try {
         console.log("📂 Frontend solicitando el historial de reseñas...");
-        // Buscamos todas las reseñas y las ordenamos por fecha descendente (-1)
-        const feedbacks = await Feedback.find().sort({ createdAt: -1 });
+
+        // ✨ PRIVACIDAD DE DATOS (PUNTO 9): Extraemos el ID y buscamos SOLO las de este usuario ✨
+        const userId = (req as any).user?.id;
+
+        if (!userId) {
+            res.status(401).json({ error: "Usuario no autenticado." });
+            return;
+        }
+
+        // 👈 La Base de Datos filtra automáticamente y solo devuelve la caja fuerte de este usuario
+        const feedbacks = await Feedback.find({ userId }).sort({ createdAt: -1 });
+
         res.status(200).json(feedbacks);
     } catch (error) {
         console.error("❌ Error obteniendo reseñas:", error);
