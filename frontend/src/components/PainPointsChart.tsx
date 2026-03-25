@@ -54,7 +54,7 @@ export const PainPointsChart = ({ history }: PainPointsChartProps) => {
                         cursor={{ fill: '#f1f5f9' }}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
-                        {chartData.map((entry, index) => (
+                        {chartData.map((_entry, index) => (
                             <Cell key={`cell-${index}`} fill="#f43f5e" /> // Color rojo-rosa para problemas
                         ))}
                     </Bar>
