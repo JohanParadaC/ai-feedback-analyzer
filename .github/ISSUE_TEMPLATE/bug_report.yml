@@ -1,0 +1,65 @@
+name: Informe de error
+description: Algo no funciona como debería
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportarlo. Cuanto más concreto sea, antes se puede arreglar.
+
+        ⚠️ **Si se trata de una vulnerabilidad de seguridad, no la publiques aquí.**
+        Escribe en privado a la dirección del perfil de @JohanParadaC.
+
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Qué ocurre
+      description: Describe el fallo en una o dos frases.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproducir
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. Inicio sesión con una cuenta nueva
+        2. Subo un CSV con 30 filas
+        3. Pulso "Analizar"
+        4. Aparece el error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Qué esperabas que pasara
+    validations:
+      required: true
+
+  - type: dropdown
+    id: zona
+    attributes:
+      label: Dónde ocurre
+      options:
+        - Frontend (interfaz)
+        - Backend (API)
+        - No lo sé
+    validations:
+      required: true
+
+  - type: input
+    id: entorno
+    attributes:
+      label: Entorno
+      description: Versión de Node, sistema operativo y navegador.
+      placeholder: "Node 20.11, Windows 11, Chrome 133"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Errores en consola o logs
+      description: Pega aquí lo que aparezca. **Quita las claves de API y los tokens.**
+      render: shell

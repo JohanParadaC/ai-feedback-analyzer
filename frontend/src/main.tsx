@@ -2,14 +2,17 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-// ✨ 1. IMPORTAMOS NUESTRO PROVEEDOR DE AUTENTICACIÓN
 import { AuthProvider } from './context/AuthContext.tsx'
+import { ThemeProvider } from './context/ThemeContext.tsx'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {/* ✨ 2. ENVOLVEMOS LA APLICACIÓN PARA QUE TODOS TENGAN ACCESO A LA BILLETERA */}
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    {/* ThemeProvider va por fuera: la pantalla de login también necesita
+        saber el tema, y se renderiza cuando aún no hay sesión. */}
+    <ThemeProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 )

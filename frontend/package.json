@@ -1,11 +1,18 @@
 {
-  "name": "frontend",
+  "name": "ai-feedback-analyzer-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Interfaz del AI Feedback Analyzer: panel de sentimiento, NPS y exportación de informes.",
+  "license": "MIT",
+  "author": "Johan Parada",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "preview": "vite preview"
   },

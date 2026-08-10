@@ -1,45 +1,81 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import rateLimit from 'express-rate-limit'; // ✨ IMPORTAMOS EL GUARDIA
+import rateLimit from 'express-rate-limit';
+
+// La configuración se valida al importarse: si falta una variable, el proceso
+// termina aquí con un mensaje claro en vez de fallar más tarde en runtime.
+import env, { corsOrigins } from './config/env.js';
 import apiRoutes from './routes/api.routes.js';
-// ✨ NUEVO: Importamos las rutas del recepcionista (auth)
 import authRoutes from './routes/auth.routes.js';
 import { connectDB } from './config/db.js';
 
-// Carga las variables de entorno (API Key y MONGO_URI)
-dotenv.config();
-
-// ✨ ENCENDEMOS LA BASE DE DATOS ANTES DE ARRANCAR EL SERVIDOR ✨
-connectDB();
-
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// ✨ 1. BLINDAJE CORS: Solo aceptamos peticiones de tu frontend local
+// Detrás de un proxy (Render, Railway, nginx…) la IP del socket es la del
+// proxy, así que sin esto TODOS los usuarios comparten el mismo contador de
+// rate limiting. Se configura con un número exacto de saltos en vez de `true`:
+// confiar en toda la cadena permitiría a cualquiera falsear su IP con una
+// cabecera X-Forwarded-For y saltarse el límite.
+if (env.TRUST_PROXY > 0) {
+    app.set('trust proxy', env.TRUST_PROXY);
+}
+
+// 1. CORS: solo los orígenes declarados en CORS_ORIGIN.
 app.use(cors({
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST']
+    origin: corsOrigins,
+    methods: ['GET', 'POST'],
 }));
 
-// Middlewares de parseo
-app.use(express.json());
+// Limitamos el tamaño del body: sin esto, un POST de varios MB llega a la capa
+// de validación y consume memoria por cada petición concurrente.
+app.use(express.json({ limit: '100kb' }));
 
-// ✨ 2. RATE LIMITING: Máximo 50 peticiones cada 15 minutos por usuario (IP)
+// 2. Rate limiting general de la API.
 const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 50, // Límite de 50 peticiones
-    message: { error: "Has superado el límite de peticiones. Por favor, intenta de nuevo en 15 minutos. 🛡️" },
+    windowMs: 15 * 60 * 1000,
+    max: 50,
+    message: { error: 'Has superado el límite de peticiones. Por favor, intenta de nuevo en 15 minutos. 🛡️' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
-// Montamos todas nuestras rutas bajo el prefijo "/api" y le ponemos el escudo
+// 3. Rate limiting específico para login/registro. El límite general de 50 es
+//    demasiado holgado para un endpoint de contraseñas: 10 intentos por ventana
+//    hace inviable la fuerza bruta sin estorbar a un usuario real.
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: 'Demasiados intentos de autenticación. Espera 15 minutos e intenta de nuevo. 🛡️' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true, // Solo penalizamos los intentos fallidos.
+});
+
+// Las rutas de auth se montan antes que /api para que apliquen su propio límite.
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api', apiLimiter, apiRoutes);
 
-// ✨ NUEVO: Montamos las puertas de Registro y Login en "/api/auth"
-app.use('/api/auth', authRoutes);
-
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor Backend BLINDADO corriendo de forma limpia en http://localhost:${PORT}`);
+// Healthcheck para plataformas de despliegue y monitorización.
+app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime() });
 });
+
+// Manejador de errores final: evita que un throw inesperado tumbe el proceso
+// o filtre un stack trace al cliente.
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('❌ Error no controlado:', err);
+    res.status(500).json({ error: 'Error interno del servidor.' });
+});
+
+const startServer = async () => {
+    // Conectamos a Mongo ANTES de aceptar tráfico: si arrancamos primero,
+    // las peticiones que lleguen durante la conexión fallan de forma confusa.
+    await connectDB();
+
+    app.listen(env.PORT, () => {
+        console.log(`🚀 Servidor backend escuchando en http://localhost:${env.PORT} [${env.NODE_ENV}]`);
+        console.log(`🔓 CORS habilitado para: ${corsOrigins.join(', ')}`);
+    });
+};
+
+startServer();

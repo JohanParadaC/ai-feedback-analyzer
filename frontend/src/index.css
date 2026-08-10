@@ -1,8 +1,158 @@
 @import "tailwindcss";
 
-/* Un fondo general elegante para nuestro Dashboard */
-body {
-  background-color: #f8fafc;
-  color: #1e293b;
-  -webkit-font-smoothing: antialiased;
+/* ─────────────────────────────────────────────────────────────
+   Modo oscuro por clase (no por preferencia del sistema), para
+   que el usuario pueda alternarlo desde la interfaz.
+   ───────────────────────────────────────────────────────────── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─────────────────────────────────────────────────────────────
+   Tokens de diseño
+   Un único sitio donde vive la identidad visual. Los componentes
+   usan estos nombres semánticos en vez de colores sueltos, así un
+   cambio de marca no obliga a tocar 15 archivos.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  /* Marca */
+  --color-brand-50:  #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+
+  /* Sentimiento — el color aquí codifica significado, no decoración */
+  --color-positive: #10b981;
+  --color-neutral:  #f59e0b;
+  --color-negative: #f43f5e;
+
+  /* Tipografía */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Elevación: sombras suaves y de baja opacidad. Una sombra dura
+     hace que todo parezca flotar y compite con la jerarquía real. */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-card-hover: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.06);
+  --shadow-pop: 0 12px 32px -8px rgb(15 23 42 / 0.18);
+
+  /* Animaciones */
+  --animate-fade-in: fade-in 0.35s ease-out both;
+  --animate-slide-up: slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: -1000px 0; }
+  to   { background-position: 1000px 0; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Base
+   ───────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    /* Evita el salto horizontal cuando aparece/desaparece la barra de scroll */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+    font-family: var(--font-sans);
+  }
+
+  .dark body {
+    @apply bg-slate-950 text-slate-200;
+  }
+
+  /* Un anillo de foco visible y consistente en toda la app: es la única
+     pista de navegación para quien usa teclado o lector de pantalla. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white;
+  }
+
+  .dark :focus-visible {
+    @apply ring-offset-slate-950;
+  }
+
+  /* Las cifras cambian de ancho al actualizarse y "bailan".
+     tabular-nums las mantiene alineadas. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-brand-900;
+  }
+}
+
+@layer components {
+  /* Superficie base de tarjeta, reutilizada por todo el dashboard. */
+  .card {
+    @apply bg-white border border-slate-200/80 rounded-2xl shadow-[var(--shadow-card)]
+           dark:bg-slate-900 dark:border-slate-800;
+  }
+
+  /* Etiqueta de sección: pequeña, en mayúsculas, color apagado. */
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400;
+  }
+
+  /* Bloque de carga (skeleton) con brillo animado. */
+  .skeleton {
+    @apply rounded-lg bg-slate-200/70 dark:bg-slate-800;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.45) 50%,
+      transparent 100%
+    );
+    background-size: 1000px 100%;
+    animation: var(--animate-shimmer);
+  }
+
+  .dark .skeleton {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.06) 50%,
+      transparent 100%
+    );
+  }
+}
+
+/* Respetamos a quien pide menos movimiento por accesibilidad
+   (mareos, migrañas, trastornos vestibulares). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* El informe PDF se renderiza fuera de pantalla; al imprimir,
+   ocultamos el resto de la interfaz. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
 }

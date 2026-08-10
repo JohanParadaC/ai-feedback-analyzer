@@ -6,9 +6,11 @@ interface ExportPDFParams {
     pdfRef: React.RefObject<HTMLDivElement | null>;
     history: AnalysisResult[];
     setLoading: (loading: boolean) => void;
+    /** Se llama si la exportación falla, para mostrarlo en la interfaz. */
+    onError?: (message: string) => void;
 }
 
-export const downloadPDF = async ({ pdfRef, history, setLoading }: ExportPDFParams) => {
+export const downloadPDF = async ({ pdfRef, history, setLoading, onError }: ExportPDFParams) => {
     if (!pdfRef.current || history.length === 0) return;
 
     setLoading(true);
@@ -57,7 +59,9 @@ export const downloadPDF = async ({ pdfRef, history, setLoading }: ExportPDFPara
         pdf.save('Reporte-Intelligence-Hub.pdf');
     } catch (error) {
         console.error("Error generando PDF:", error);
-        alert("Hubo un error al generar el PDF.");
+        // Un alert() bloquea la página y se ve fuera de lugar; el error se
+        // muestra en la propia interfaz.
+        onError?.("No se pudo generar el PDF. Inténtalo de nuevo.");
     } finally {
         setLoading(false);
     }

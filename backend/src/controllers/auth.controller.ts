@@ -1,26 +1,43 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import User from '../models/User.js';
+import env from '../config/env.js';
 
-// ✨ FUNCION MAGICA: Crea la tarjeta magnética (Token) que durará 30 días
+const registerSchema = z.object({
+    companyName: z.string().trim().min(2, 'El nombre de la empresa debe tener al menos 2 caracteres.').max(100),
+    email: z.string().trim().toLowerCase().email('El correo electrónico no es válido.'),
+    // 8 caracteres es el mínimo razonable; sin esto se aceptaban contraseñas de
+    // un solo carácter y el hash con bcrypt no aporta nada frente a eso.
+    password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.').max(128),
+});
+
+const loginSchema = z.object({
+    email: z.string().trim().toLowerCase().email('El correo electrónico no es válido.'),
+    password: z.string().min(1, 'La contraseña es obligatoria.'),
+});
+
+// Crea el token de sesión. El secreto viene de la config validada al arrancar:
+// nunca hay un valor por defecto, porque un secreto por defecto en un repo
+// público permite a cualquiera firmar tokens válidos.
 const generateToken = (id: string) => {
-    // Usamos una clave secreta del .env, o una por defecto si se nos olvida ponerla
-    return jwt.sign({ id }, process.env.JWT_SECRET || 'mi_secreto_super_seguro_123', {
-        expiresIn: '30d',
+    return jwt.sign({ id }, env.JWT_SECRET, {
+        expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
     });
 };
 
 // 📝 REGISTRAR NUEVA EMPRESA
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { companyName, email, password } = req.body;
-
-        // 1. Verificamos que no nos dejen campos vacíos
-        if (!companyName || !email || !password) {
-            res.status(400).json({ error: 'Por favor, llena todos los campos.' });
+        // 1. Validamos formato y longitudes antes de tocar la base de datos
+        const validData = registerSchema.safeParse(req.body);
+        if (!validData.success) {
+            res.status(400).json({ error: validData.error.issues[0]?.message || 'Datos de registro inválidos.' });
             return;
         }
+
+        const { companyName, email, password } = validData.data;
 
         // 2. Verificamos que el correo no esté registrado ya
         const userExists = await User.findOne({ email });
@@ -45,7 +62,8 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
             _id: user._id,
             companyName: user.companyName,
             email: user.email,
-            token: generateToken(user._id.toString()) // ✨ CORRECCIÓN TS: Usamos .toString()
+            // ✨ CORRECCIÓN TS: Usamos .toString() para convertir el ObjectId correctamente
+            token: generateToken(user._id.toString())
         });
 
     } catch (error) {
@@ -57,7 +75,13 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 // 🚪 INICIAR SESIÓN
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { email, password } = req.body;
+        const validData = loginSchema.safeParse(req.body);
+        if (!validData.success) {
+            res.status(401).json({ error: 'Correo o contraseña incorrectos. 🛑' });
+            return;
+        }
+
+        const { email, password } = validData.data;
 
         // 1. Buscamos a la empresa por su correo
         const user = await User.findOne({ email });
@@ -68,7 +92,8 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
                 _id: user._id,
                 companyName: user.companyName,
                 email: user.email,
-                token: generateToken(user._id.toString()) // ✨ CORRECCIÓN TS: Usamos .toString()
+                // ✨ CORRECCIÓN TS: Usamos .toString() aquí también
+                token: generateToken(user._id.toString())
             });
         } else {
             res.status(401).json({ error: 'Correo o contraseña incorrectos. 🛑' });

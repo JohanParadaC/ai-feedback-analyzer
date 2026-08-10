@@ -1,6 +1,12 @@
 import { Router } from 'express';
-import { testConnection, analyzeFeedback, getFeedbacks } from '../controllers/ai.controller.js';
-// ✨ IMPORTAMOS A NUESTRO GUARDIA DE SEGURIDAD ✨
+// ✨ IMPORTAMOS LA NUEVA FUNCIÓN 'generateReply'
+import {
+    testConnection,
+    analyzeFeedback,
+    analyzeFeedbackBatch,
+    getFeedbacks,
+    generateReply,
+} from '../controllers/ai.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -9,9 +15,14 @@ const router = Router();
 router.get('/test', testConnection);
 
 // ✨ LAS PUERTAS VIP: Le ponemos el guardia "protect" en medio ✨
-// Ahora Express ejecutará "protect" primero. Si todo sale bien, pasará a "analyzeFeedback".
 router.post('/analyze', protect, analyzeFeedback);
 
+// Carga masiva: una sola petición con hasta MAX_LOTE reseñas.
+router.post('/analyze/batch', protect, analyzeFeedbackBatch);
+
 router.get('/feedbacks', protect, getFeedbacks);
+
+// ✨ NUEVA PUERTA: Endpoint para redactar respuestas mágicas
+router.post('/generate-reply', protect, generateReply);
 
 export default router;

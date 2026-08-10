@@ -29,4 +29,13 @@ const FeedbackSchema: Schema = new Schema({
     timestamps: true
 });
 
+// Toda consulta del historial filtra por userId y ordena por fecha descendente.
+// Sin este índice compuesto, Mongo escanea la colección entera de todos los
+// inquilinos en cada carga del dashboard.
+FeedbackSchema.index({ userId: 1, date: -1 });
+
+// La cuota diaria cuenta documentos por usuario creados hoy. Sin este índice,
+// esa cuenta recorre todas las reseñas del usuario en cada análisis.
+FeedbackSchema.index({ userId: 1, createdAt: -1 });
+
 export default mongoose.model<IFeedback>('Feedback', FeedbackSchema);

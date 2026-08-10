@@ -1,11 +1,20 @@
 export type Sentiment = 'positivo' | 'negativo' | 'neutral';
 
 export interface AnalysisResult {
-    id: number;
+    /** `_id` de MongoDB, que es una cadena, no un número. */
+    id: string;
     text: string;
     sentiment: Sentiment;
     score: number;
     key_complaint: string | null;
     key_highlight: string | null;
-    date: string; // ✨ ¡Nueva propiedad para la línea de tiempo!
+    /** Fecha en formato ISO. */
+    date: string;
+}
+
+/** Punto del gráfico de reparto por sentimiento. */
+export interface ChartDatum {
+    name: string;
+    value: number;
+    color: string;
 }

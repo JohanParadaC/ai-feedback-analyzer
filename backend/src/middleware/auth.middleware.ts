@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import env from '../config/env.js';
 
 // ✨ TRUCO TYPESCRIPT: Extendemos la petición (Request) para poder inyectarle el ID del usuario
 export interface AuthRequest extends Request {
@@ -9,29 +10,34 @@ export interface AuthRequest extends Request {
 }
 
 export const protect = (req: AuthRequest, res: Response, next: NextFunction): void => {
-    let token;
+    const authHeader = req.headers.authorization;
 
-    // 1. Verificamos si el Frontend nos mandó el token en la cabecera (Headers)
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        try {
-            // El token viene así: "Bearer eyJhbGciOiJIUzI1NiIsInR..." (separamos por el espacio y tomamos el 2do elemento)
-            token = req.headers.authorization.split(' ')[1];
-
-            // 2. Verificamos que el token sea original y no haya caducado
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'mi_secreto_super_seguro_123') as { id: string };
-
-            // 3. ¡Magia! Si es válido, le pegamos el ID de la empresa a la petición y lo dejamos pasar
-            req.user = { id: decoded.id };
-
-            next(); // 👉 "Puedes pasar a la cocina"
-        } catch (error) {
-            console.error("❌ Intento de acceso denegado (Token inválido):", error);
-            res.status(401).json({ error: 'No autorizado. Tu sesión ha expirado o el token es inválido. 🛑' });
-        }
+    // 1. El header debe existir y venir en formato "Bearer <token>".
+    //    Exigimos el espacio para no aceptar cabeceras tipo "BearerXYZ".
+    if (!authHeader?.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'No autorizado. Necesitas iniciar sesión primero. 🛑' });
+        return;
     }
 
-    // Si ni siquiera traía token...
+    const token = authHeader.slice('Bearer '.length).trim();
+
+    // 2. "Bearer " sin nada detrás no es un intento válido de autenticación.
     if (!token) {
         res.status(401).json({ error: 'No autorizado. Necesitas iniciar sesión primero. 🛑' });
+        return;
+    }
+
+    try {
+        // 3. Verificamos firma y expiración.
+        const decoded = jwt.verify(token, env.JWT_SECRET) as { id: string };
+
+        // 4. Si es válido, inyectamos el ID de la empresa en la petición.
+        req.user = { id: decoded.id };
+
+        next();
+    } catch {
+        // No logueamos el token ni el error completo: acabaría en los logs material
+        // que sirve para replicar el intento.
+        res.status(401).json({ error: 'No autorizado. Tu sesión ha expirado o el token es inválido. 🛑' });
     }
 };
