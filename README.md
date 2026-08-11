@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧠 Intelligence Hub esta semana.
+# 🧠 Intelligence Hub.
 
 **Convierte el feedback desordenado de tus clientes en datos accionables.**
 
