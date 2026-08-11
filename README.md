@@ -23,7 +23,7 @@ Las empresas acumulan miles de reseñas, tickets y comentarios que nadie llega a
 La información útil (qué falla, qué gusta, si mejoramos o empeoramos) queda enterrada
 en texto libre.
 
-**AI Feedback Analyzer** usa un LLM como *pipeline de datos*, no como chatbot: recibe
+**Intelligence Hub** usa un LLM como *pipeline de datos*, no como chatbot: recibe
 texto sin estructura y devuelve siempre el mismo JSON validado, listo para graficar.
 
 ## Características
