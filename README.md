@@ -195,8 +195,6 @@ gasto en OpenAI y el crecimiento de la base de datos se acotan por cuenta.
 > al número real de saltos. Con `0` detrás de un proxy, todos tus usuarios
 > comparten un único contador de rate limiting.
 
-Ten en cuenta que **el registro es público**: cualquiera puede crear una cuenta y
-consumir su propia cuota. Si vas a publicar una demo, baja `MAX_ANALISIS_DIARIOS`.
 
 Si encuentras una vulnerabilidad, no abras un issue público: escribe a la dirección
 del perfil de [@JohanParadaC](https://github.com/JohanParadaC).
