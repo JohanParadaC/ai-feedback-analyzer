@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧠 AI Feedback Analyzer
+# 🧠 Intelligence Hub esta semana.
 
 **Convierte el feedback desordenado de tus clientes en datos accionables.**
 
